@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - SkyFleet</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <style>
+        * { font-family: system-ui, -apple-system, sans-serif; }
+        body { background: linear-gradient(135deg, #0093E9 0%, #80D0C7 100%); }
+        .glass { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); }
+        .btn-primary { background: linear-gradient(135deg, #0093E9, #13B0F5); }
+        .spinner { border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; width: 20px; height: 20px; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .role-card { transition: all 0.2s; cursor: pointer; }
+        .role-card.selected { border-color: #0093E9; background: rgba(0,147,233,0.08); }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-sm">
+        <a href="index.html" class="inline-flex items-center text-white hover:text-white/80 mb-4 text-sm">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+            Home
+        </a>
+        
+        <div class="glass rounded-2xl p-6 shadow-xl">
+            <div class="text-center mb-6">
+                <div class="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl mb-3">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-900">Create Account</h2>
+                <p class="text-sm text-gray-600">Join SkyFleet</p>
+            </div>
+            
+            <form id="signup-form" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Email</label>
+                    <input id="signup-email" type="email" required class="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none text-sm" placeholder="you@example.com">
+                </div>
+                
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Password</label>
+                    <input id="signup-password" type="password" required minlength="6" class="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none text-sm" placeholder="Min 6 characters">
+                </div>
+                
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-2">Account Type</label>
+                    <div class="space-y-2">
+                        <div class="role-card selected border-2 rounded-lg p-2" onclick="selectRole('user', this)">
+                            <label class="flex items-center cursor-pointer">
+                                <input type="radio" name="role" value="user" id="role-user" class="mr-2" checked>
+                                <svg class="w-5 h-5 text-cyan-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                <div class="text-sm"><div class="font-semibold text-gray-900">Passenger</div></div>
+                            </label>
+                        </div>
+                        
+                        <div class="role-card border-2 rounded-lg p-2" onclick="selectRole('crew', this)">
+                            <label class="flex items-center cursor-pointer">
+                                <input type="radio" name="role" value="crew" id="role-crew" class="mr-2">
+                                <svg class="w-5 h-5 text-teal-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                                <div class="text-sm"><div class="font-semibold text-gray-900">Crew</div></div>
+                            </label>
+                        </div>
+                        
+                        <div class="role-card border-2 rounded-lg p-2" onclick="selectRole('admin', this)">
+                            <label class="flex items-center cursor-pointer">
+                                <input type="radio" name="role" value="admin" id="role-admin" class="mr-2">
+                                <svg class="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                                <div class="text-sm"><div class="font-semibold text-gray-900">Admin</div></div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex items-start">
+                    <input type="checkbox" id="terms" required class="mt-1 mr-2">
+                    <label for="terms" class="text-xs text-gray-600">I agree to the <a href="#" class="text-cyan-600 hover:underline">Terms</a> & <a href="#" class="text-cyan-600 hover:underline">Privacy</a></label>
+                </div>
+                
+                <button type="submit" id="signup-btn" class="w-full py-2.5 btn-primary text-white rounded-lg font-semibold hover:shadow-lg transition flex items-center justify-center">
+                    <span id="signup-btn-text">Create Account</span>
+                    <span id="signup-btn-spinner" class="spinner hidden"></span>
+                </button>
+            </form>
+            
+            <div class="mt-6 text-center text-sm">
+                <p class="text-gray-600">Have an account? <a href="login.html" class="font-semibold text-cyan-600 hover:underline">Sign in</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase Configuration -->
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyD-CiRfXcXfmu1qgLrkg94REk-Y3a9kW_U",
+            authDomain: "skyfleet-app-project-11.firebaseapp.com",
+            projectId: "skyfleet-app-project-11",
+            storageBucket: "skyfleet-app-project-11.firebasestorage.app",
+            messagingSenderId: "979622570693",
+            appId: "1:979622570693:web:6c41c6d3a371b34bd45eac"
+        };
+        firebase.initializeApp(firebaseConfig);
+        
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        
+        // Role selection
+        function selectRole(role, element) {
+            // Remove selected class from all cards
+            document.querySelectorAll('.role-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            // Add selected class to clicked card
+            element.classList.add('selected');
+            // Check the radio button
+            document.getElementById(`role-${role}`).checked = true;
+        }
+        
+        // Initialize first role card as selected
+        document.querySelector('.role-card').classList.add('selected');
+        
+        // Signup Form Handler
+        document.getElementById('signup-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            const role = document.querySelector('input[name="role"]:checked').value;
+            const btnText = document.getElementById('signup-btn-text');
+            const btnSpinner = document.getElementById('signup-btn-spinner');
+            const btn = document.getElementById('signup-btn');
+            
+            // Show loading state
+            btn.disabled = true;
+            btnText.classList.add('hidden');
+            btnSpinner.classList.remove('hidden');
+            
+            try {
+                // Create user account
+                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                const user = userCredential.user;
+                
+                // Save user data to Firestore
+                await db.collection('users').doc(user.uid).set({
+                    email: email,
+                    role: role,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                // Success notification
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Account Created!',
+                    text: 'Welcome to SkyFleet',
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+                
+                // Redirect based on role
+                if (role === 'admin') {
+                    window.location.href = 'admin-dashboard.html';
+                } else if (role === 'crew') {
+                    window.location.href = 'crew-dashboard.html';
+                } else {
+                    window.location.href = 'user-dashboard.html';
+                }
+            } catch (error) {
+                // Reset button state
+                btn.disabled = false;
+                btnText.classList.remove('hidden');
+                btnSpinner.classList.add('hidden');
+                
+                // Error notification
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Signup Failed',
+                    text: error.message,
+                    confirmButtonColor: '#0093E9'
+                });
+            }
+        });
+    </script>
+</body>
+</html>

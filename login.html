@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - SkyFleet</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <style>
+        * { font-family: system-ui, -apple-system, sans-serif; }
+        body { background: linear-gradient(135deg, #0093E9 0%, #80D0C7 100%); }
+        .glass { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); }
+        .btn-primary { background: linear-gradient(135deg, #0093E9, #13B0F5); }
+        .spinner { border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; width: 20px; height: 20px; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-sm">
+        <a href="index.html" class="inline-flex items-center text-white hover:text-white/80 mb-4 text-sm">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+            Home
+        </a>
+        
+        <div class="glass rounded-2xl p-6 shadow-xl">
+            <div class="text-center mb-6">
+                <div class="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl mb-3">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-900">Welcome Back</h2>
+                <p class="text-sm text-gray-600">Sign in to SkyFleet</p>
+            </div>
+            
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Email</label>
+                    <input id="login-email" type="email" required class="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none text-sm" placeholder="you@example.com">
+                </div>
+                
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Password</label>
+                    <input id="login-password" type="password" required class="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none text-sm" placeholder="••••••••">
+                </div>
+                
+                <div class="flex items-center justify-between text-xs">
+                    <label class="flex items-center"><input type="checkbox" class="mr-1"> Remember</label>
+                    <a href="#" class="text-cyan-600 hover:underline">Forgot?</a>
+                </div>
+                
+                <button type="submit" id="login-btn" class="w-full py-2.5 btn-primary text-white rounded-lg font-semibold hover:shadow-lg transition flex items-center justify-center">
+                    <span id="login-btn-text">Sign In</span>
+                    <span id="login-btn-spinner" class="spinner hidden"></span>
+                </button>
+            </form>
+            
+            <div class="mt-6 text-center text-sm">
+                <p class="text-gray-600">Don't have an account? <a href="signup.html" class="font-semibold text-cyan-600 hover:underline">Sign up</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase Configuration -->
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyD-CiRfXcXfmu1qgLrkg94REk-Y3a9kW_U",
+            authDomain: "skyfleet-app-project-11.firebaseapp.com",
+            projectId: "skyfleet-app-project-11",
+            storageBucket: "skyfleet-app-project-11.firebasestorage.app",
+            messagingSenderId: "979622570693",
+            appId: "1:979622570693:web:6c41c6d3a371b34bd45eac"
+        };
+        firebase.initializeApp(firebaseConfig);
+        
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        
+        // Login Form Handler
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const btnText = document.getElementById('login-btn-text');
+            const btnSpinner = document.getElementById('login-btn-spinner');
+            const btn = document.getElementById('login-btn');
+            
+            // Show loading state
+            btn.disabled = true;
+            btnText.classList.add('hidden');
+            btnSpinner.classList.remove('hidden');
+            
+            try {
+                const userCredential = await auth.signInWithEmailAndPassword(email, password);
+                const user = userCredential.user;
+                
+                // Get user role from Firestore
+                const userDoc = await db.collection('users').doc(user.uid).get();
+                const role = userDoc.data()?.role || 'user';
+                
+                // Success notification
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Welcome Back!',
+                    text: 'Login successful',
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+                
+                // Redirect based on role
+                if (role === 'admin') {
+                    window.location.href = 'admin-dashboard.html';
+                } else if (role === 'crew') {
+                    window.location.href = 'crew-dashboard.html';
+                } else {
+                    window.location.href = 'user-dashboard.html';
+                }
+            } catch (error) {
+                // Reset button state
+                btn.disabled = false;
+                btnText.classList.remove('hidden');
+                btnSpinner.classList.add('hidden');
+                
+                // Error notification
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Login Failed',
+                    text: error.message,
+                    confirmButtonColor: '#0093E9'
+                });
+            }
+        });
+    </script>
+</body>
+</html>

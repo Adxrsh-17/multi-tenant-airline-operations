@@ -1,0 +1,1502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - SkyFleet</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+        .glass { background: rgba(255,255,255,0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.2); }
+        .btn-primary { background: #1e40af; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary:hover { background: #1d4ed8; transform: translateY(-1px); }
+        .btn-danger { background: #dc2626; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 600; }
+        .btn-danger:hover { background: #b91c1c; }
+        .sidebar { transition: width 0.3s ease; }
+        .nav-item { transition: all 0.2s; }
+        .nav-item.active { background-color: #312e81; color: white; }
+        .nav-item:hover:not(.active) { background-color: #475569; color: white; }
+        .table-header { background-color: #f8fafc; }
+        .modal-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+        }
+        .modal-input:focus { outline: none; border-color: #3b82f6; }
+        .swal2-container { z-index: 9999 !important; }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status-active { background: #dcfce7; color: #166534; }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-maintenance { background: #fee2e2; color: #991b1b; }
+        .dropdown-menu {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 100%;
+            margin-top: 0.5rem;
+            background: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            z-index: 50;
+        }
+        .dropdown-menu.active {
+            display: block;
+            animation: fadeIn 0.2s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        #calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+        }
+        .calendar-day {
+            min-height: 120px;
+            padding: 8px;
+            background-color: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.375rem;
+            transition: all 0.2s;
+        }
+        .calendar-day:hover { border-color: #3b82f6; }
+        .calendar-day.other-month {
+            background-color: #f8fafc;
+            color: #94a3b8;
+        }
+        .calendar-day-header {
+            font-weight: 600;
+            font-size: 0.875rem;
+            text-align: right;
+        }
+        .flight-event {
+            background-color: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            margin-top: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .flight-event:hover {
+            background-color: #dbeafe;
+        }
+        .crew-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            transition: all 0.2s;
+        }
+        .crew-card:hover {
+            border-color: #3b82f6;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-slate-100">
+
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <aside class="sidebar fixed inset-y-0 left-0 w-64 bg-slate-900 text-white z-50 flex flex-col">
+            <div class="flex h-16 items-center justify-center border-b border-slate-700 flex-shrink-0 px-4">
+                <svg class="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                <span class="ml-3 text-xl font-bold">SkyFleet</span>
+            </div>
+            
+            <nav class="mt-5 px-2 space-y-1 flex-grow overflow-y-auto">
+                <a href="#" onclick="switchView('overview')" class="nav-item active group flex items-center px-2 py-2.5 text-sm font-medium rounded-md">
+                    <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                    Dashboard
+                </a>
+                <a href="#" onclick="switchView('flights')" class="nav-item text-slate-300 group flex items-center px-2 py-2.5 text-sm font-medium rounded-md">
+                    <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    Flight Management
+                </a>
+                <a href="#" onclick="switchView('scheduling')" class="nav-item text-slate-300 group flex items-center px-2 py-2.5 text-sm font-medium rounded-md">
+                    <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                    Crew Scheduling
+                </a>
+                <a href="#" onclick="switchView('crew')" class="nav-item text-slate-300 group flex items-center px-2 py-2.5 text-sm font-medium rounded-md">
+                    <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    Crew Roster
+                </a>
+                <a href="#" onclick="switchView('fleet')" class="nav-item text-slate-300 group flex items-center px-2 py-2.5 text-sm font-medium rounded-md">
+                    <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064"/></svg>
+                    Fleet Control
+                </a>
+                <a href="#" onclick="switchView('bookings')" class="nav-item text-slate-300 group flex items-center px-2 py-2.5 text-sm font-medium rounded-md">
+                    <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                    Bookings
+                </a>
+                <a href="#" onclick="switchView('invites')" class="nav-item text-slate-300 group flex items-center px-2 py-2.5 text-sm font-medium rounded-md">
+                    <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                    Invite Management
+                </a>
+                <a href="#" onclick="switchView('analytics')" class="nav-item text-slate-300 group flex items-center px-2 py-2.5 text-sm font-medium rounded-md">
+                    <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                    Analytics
+                </a>
+            </nav>
+            <div class="px-2 pb-4">
+                 <a href="#" onclick="logout()" class="text-slate-300 hover:bg-red-700 hover:text-white group flex items-center px-2 py-2.5 text-sm font-medium rounded-md">
+                     <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                     Logout
+                 </a>
+            </div>
+        </aside>
+        
+        <div class="flex-1 pl-64">
+            <!-- Header -->
+            <header class="bg-white shadow-sm sticky top-0 z-40">
+                <div class="px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center h-16">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-800" id="page-title">Dashboard</h1>
+                        <p class="text-sm text-slate-500" id="page-subtitle">Welcome back, Administrator</p>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="relative">
+                            <button onclick="toggleDropdown()" class="flex items-center space-x-3 focus:outline-none hover:bg-gray-100 rounded-lg p-2 transition-colors">
+                                <img class="h-9 w-9 rounded-full ring-2 ring-offset-2 ring-blue-500" src="https://ui-avatars.com/api/?name=Admin&background=3b82f6&color=fff" alt="Admin">
+                                <div class="text-left hidden md:block">
+                                    <p class="text-sm font-semibold text-slate-700" id="user-email-display"></p>
+                                    <p class="text-xs text-slate-500">Administrator</p>
+                                </div>
+                                <svg class="h-5 w-5 text-slate-400 hidden md:block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            
+                            <div id="user-dropdown" class="dropdown-menu w-56">
+                                <div class="px-4 py-3 border-b">
+                                    <p class="text-sm font-medium text-gray-900">Signed in as</p>
+                                    <p class="text-sm text-gray-500 truncate" id="user-email-dropdown"></p>
+                                </div>
+                                <div class="py-1">
+                                    <a href="#" onclick="logout()" class="w-full text-left flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+                                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                                        Sign Out
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+            
+            <main class="p-6 space-y-6">
+                <!-- Overview Section -->
+                <section id="overview-section">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                        <div class="bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-lg shadow-lg text-white">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="text-sm font-medium opacity-90">Total Flights</h3>
+                                    <p class="text-3xl font-bold mt-2" id="total-flights">0</p>
+                                </div>
+                                <svg class="w-12 h-12 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                            </div>
+                        </div>
+                        <div class="bg-gradient-to-br from-green-500 to-green-600 p-6 rounded-lg shadow-lg text-white">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="text-sm font-medium opacity-90">Aircraft in Fleet</h3>
+                                    <p class="text-3xl font-bold mt-2" id="total-fleet">0</p>
+                                </div>
+                                <svg class="w-12 h-12 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064"/></svg>
+                            </div>
+                        </div>
+                        <div class="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-lg shadow-lg text-white">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="text-sm font-medium opacity-90">Active Crew</h3>
+                                    <p class="text-3xl font-bold mt-2" id="total-crew">0</p>
+                                </div>
+                                <svg class="w-12 h-12 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                            </div>
+                        </div>
+                        <div class="bg-gradient-to-br from-orange-500 to-orange-600 p-6 rounded-lg shadow-lg text-white">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="text-sm font-medium opacity-90">Pending Invites</h3>
+                                    <p class="text-3xl font-bold mt-2" id="total-invites">0</p>
+                                </div>
+                                <svg class="w-12 h-12 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <h3 class="text-lg font-bold text-slate-800 mb-4">Recent Flights</h3>
+                            <div id="recent-flights-list" class="space-y-3"></div>
+                        </div>
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <h3 class="text-lg font-bold text-slate-800 mb-4">Fleet Status</h3>
+                            <div id="fleet-status-list" class="space-y-3"></div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Flight Management Section -->
+                <section id="flights-section" class="hidden">
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-bold text-slate-800">Flight Management</h2>
+                            <button onclick="showAddEditFlightModal()" class="btn-primary">
+                                <svg class="w-5 h-5 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                Add New Flight
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left text-slate-500">
+                                <thead class="text-xs text-slate-700 uppercase table-header">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3">Flight No.</th>
+                                        <th scope="col" class="px-6 py-3">Route</th>
+                                        <th scope="col" class="px-6 py-3">Schedule</th>
+                                        <th scope="col" class="px-6 py-3">Aircraft</th>
+                                        <th scope="col" class="px-6 py-3">Status</th>
+                                        <th scope="col" class="px-6 py-3 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="flights-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Crew Scheduling Section -->
+                <section id="scheduling-section" class="hidden">
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-bold text-slate-800">Crew Scheduling Calendar</h2>
+                            <div class="flex items-center gap-4">
+                                <button id="prev-month" class="p-2 rounded-full hover:bg-slate-100 font-bold">&lt;</button>
+                                <h3 id="calendar-month-year" class="text-lg font-semibold"></h3>
+                                <button id="next-month" class="p-2 rounded-full hover:bg-slate-100 font-bold">&gt;</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-7 gap-2 text-center font-semibold text-sm text-slate-600 mb-2">
+                            <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+                        </div>
+                        <div id="calendar-grid"></div>
+                    </div>
+                </section>
+
+                <!-- Crew Roster Section -->
+                <section id="crew-section" class="hidden">
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-bold text-slate-800">Crew Roster</h2>
+                            <button onclick="showAddEditCrewModal()" class="btn-primary">
+                                <svg class="w-5 h-5 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                Add Crew Member
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left text-slate-500">
+                                <thead class="text-xs text-slate-700 uppercase table-header">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3">Name</th>
+                                        <th scope="col" class="px-6 py-3">Email</th>
+                                        <th scope="col" class="px-6 py-3">Role</th>
+                                        <th scope="col" class="px-6 py-3">Status</th>
+                                        <th scope="col" class="px-6 py-3 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="crew-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Fleet Control Section -->
+                <section id="fleet-section" class="hidden">
+                       <div class="bg-white p-6 rounded-lg shadow">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-xl font-bold text-slate-800">Fleet Control</h2>
+                                <button onclick="showAddEditFleetModal()" class="btn-primary">
+                                    <svg class="w-5 h-5 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                    Add Aircraft
+                                </button>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm text-left text-slate-500">
+                                    <thead class="text-xs text-slate-700 uppercase table-header">
+                                        <tr>
+                                            <th scope="col" class="px-6 py-3">Tail No.</th>
+                                            <th scope="col" class="px-6 py-3">Model</th>
+                                            <th scope="col" class="px-6 py-3">Capacity</th>
+                                            <th scope="col" class="px-6 py-3">Status</th>
+                                            <th scope="col" class="px-6 py-3 text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="fleet-table-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                </section>
+
+                <!-- Bookings Section -->
+                <section id="bookings-section" class="hidden">
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-bold text-slate-800">Bookings Management</h2>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left text-slate-500">
+                                <thead class="text-xs text-slate-700 uppercase table-header">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3">Booking ID</th>
+                                        <th scope="col" class="px-6 py-3">Passenger</th>
+                                        <th scope="col" class="px-6 py-3">Flight</th>
+                                        <th scope="col" class="px-6 py-3">Date</th>
+                                        <th scope="col" class="px-6 py-3">Status</th>
+                                        <th scope="col" class="px-6 py-3 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bookings-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Invite Management Section -->
+                <section id="invites-section" class="hidden">
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <div class="flex justify-between items-center mb-4">
+                             <h2 class="text-xl font-bold text-slate-800">Invite Management</h2>
+                             <button onclick="sendNewInvite()" class="btn-primary">
+                                 <svg class="w-5 h-5 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                 Send New Invite
+                             </button>
+                        </div>
+                         <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left text-slate-500">
+                                <thead class="text-xs text-slate-700 uppercase table-header">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3">Email</th>
+                                        <th scope="col" class="px-6 py-3">Sent At</th>
+                                        <th scope="col" class="px-6 py-3">Status</th>
+                                        <th scope="col" class="px-6 py-3 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="invites-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Analytics Section -->
+                <section id="analytics-section" class="hidden">
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h2 class="text-xl font-bold text-slate-800 mb-4">Analytics Dashboard</h2>
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="border rounded-lg p-4">
+                                <h3 class="font-semibold text-slate-700 mb-3">Flight Statistics</h3>
+                                <div id="flight-analytics" class="space-y-2"></div>
+                            </div>
+                            <div class="border rounded-lg p-4">
+                                <h3 class="font-semibold text-slate-700 mb-3">Fleet Utilization</h3>
+                                <div id="fleet-analytics" class="space-y-2"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </main>
+        </div>
+    </div>
+    
+    <script>
+        // --- FIREBASE CONFIG ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyD-CiRfXcXfmu1qgLrkg94REk-Y3a9kW_U",
+            authDomain: "skyfleet-app-project-11.firebaseapp.com",
+            projectId: "skyfleet-app-project-11",
+            storageBucket: "skyfleet-app-project-11.appspot.com",
+            messagingSenderId: "979622570693",
+            appId: "1:979622570693:web:6c41c6d3a371b34bd45eac"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const FieldValue = firebase.firestore.FieldValue;
+
+        // --- CREW ROLE DEFINITIONS ---
+        const IN_FLIGHT_ROLES = {
+            pilot: { label: 'Pilot' },
+            copilot: { label: 'Co-pilot' },
+            cabinCrewManager: { label: 'Cabin Crew Manager' },
+            cabinCrew1: { label: 'Cabin Crew 1' },
+            cabinCrew2: { label: 'Cabin Crew 2' },
+            cabinCrew3: { label: 'Cabin Crew 3' },
+            cabinCrew4: { label: 'Cabin Crew 4' },
+            cabinCrew5: { label: 'Cabin Crew 5' },
+            cabinCrew6: { label: 'Cabin Crew 6' },
+            cabinCrew7: { label: 'Cabin Crew 7' },
+        };
+        
+        const GROUND_STAFF_ROLES = {
+            customerService: { label: 'Customer Service Rep' },
+            baggageHandler: { label: 'Baggage Handler' },
+            securityOfficer: { label: 'Security Officer' },
+            maintenanceCrew: { label: 'Maintenance Crew' },
+            ticketingAgent: { label: 'Ticketing Agent' },
+        };
+        
+        // --- CORE APP LOGIC ---
+        document.addEventListener('DOMContentLoaded', () => {
+            auth.onAuthStateChanged(async (user) => {
+                if (!user) { 
+                    window.location.href = 'login.html'; 
+                    return; 
+                }
+                
+                const userDoc = await db.collection('users').doc(user.uid).get();
+                if (userDoc.exists && userDoc.data()?.role !== 'admin') {
+                    await Swal.fire('Access Denied', 'You do not have permission to view this page.', 'error');
+                    auth.signOut(); 
+                    return;
+                }
+                
+                document.getElementById('user-email-display').textContent = user.email;
+                document.getElementById('user-email-dropdown').textContent = user.email;
+                loadAllData();
+            });
+            
+            // Calendar navigation
+            let currentDate = new Date();
+            document.getElementById('prev-month').addEventListener('click', () => {
+                currentDate.setMonth(currentDate.getMonth() - 1);
+                generateCalendar(currentDate.getFullYear(), currentDate.getMonth());
+            });
+            document.getElementById('next-month').addEventListener('click', () => {
+                currentDate.setMonth(currentDate.getMonth() + 1);
+                generateCalendar(currentDate.getFullYear(), currentDate.getMonth());
+            });
+        });
+
+        async function loadAllData() {
+            await Promise.all([
+                loadStats(),
+                loadFlights(),
+                loadFleet(),
+                loadInvites(),
+                loadCrew(),
+                loadBookings()
+            ]);
+        }
+
+        // --- NAVIGATION ---
+        function switchView(view) {
+            document.querySelectorAll('section').forEach(sec => sec.classList.add('hidden'));
+            document.getElementById(`${view}-section`).classList.remove('hidden');
+
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active', 'bg-slate-700', 'text-white');
+            });
+            const activeItem = document.querySelector(`.nav-item[onclick="switchView('${view}')"]`);
+            if (activeItem) {
+                activeItem.classList.add('active', 'bg-slate-700', 'text-white');
+                document.getElementById('page-title').textContent = activeItem.textContent.trim();
+            }
+
+            if (view === 'scheduling') {
+                generateCalendar(new Date().getFullYear(), new Date().getMonth());
+            }
+            if (view === 'analytics') {
+                loadAnalytics();
+            }
+        }
+
+        // --- DROPDOWN TOGGLE ---
+        function toggleDropdown() {
+            const dropdown = document.getElementById('user-dropdown');
+            dropdown.classList.toggle('active');
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById('user-dropdown');
+            const button = dropdown.previousElementSibling;
+            if (!dropdown.contains(e.target) && !button.contains(e.target)) {
+                dropdown.classList.remove('active');
+            }
+        });
+
+        // --- STATS ---
+        async function loadStats() {
+            const flights = await db.collection('flights').get();
+            const fleet = await db.collection('fleet').get();
+            const crew = await db.collection('users').where('role', '==', 'crew').get();
+            const invites = await db.collection('invites').where('status', '==', 'pending').get();
+            
+            document.getElementById('total-flights').textContent = flights.size;
+            document.getElementById('total-fleet').textContent = fleet.size;
+            document.getElementById('total-crew').textContent = crew.size;
+            document.getElementById('total-invites').textContent = invites.size;
+
+            // Load recent flights for overview
+            const recentFlightsList = document.getElementById('recent-flights-list');
+            recentFlightsList.innerHTML = '';
+            const recentFlights = await db.collection('flights').orderBy('date', 'desc').limit(5).get();
+            if (recentFlights.empty) {
+                recentFlightsList.innerHTML = '<p class="text-slate-400 text-sm">No flights scheduled</p>';
+            } else {
+                recentFlights.forEach(doc => {
+                    const flight = doc.data();
+                    recentFlightsList.innerHTML += `
+                        <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
+                            <div>
+                                <p class="font-semibold text-slate-800">${flight.flightNumber}</p>
+                                <p class="text-sm text-slate-500">${flight.from} → ${flight.to}</p>
+                            </div>
+                            <span class="text-xs font-medium px-2 py-1 rounded-full ${getStatusClass(flight.status)}">${flight.status}</span>
+                        </div>
+                    `;
+                });
+            }
+
+            // Load fleet status for overview
+            const fleetStatusList = document.getElementById('fleet-status-list');
+            fleetStatusList.innerHTML = '';
+            const fleetDocs = await db.collection('fleet').limit(5).get();
+            if (fleetDocs.empty) {
+                fleetStatusList.innerHTML = '<p class="text-slate-400 text-sm">No aircraft in fleet</p>';
+            } else {
+                fleetDocs.forEach(doc => {
+                    const aircraft = doc.data();
+                    fleetStatusList.innerHTML += `
+                        <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
+                            <div>
+                                <p class="font-semibold text-slate-800">${aircraft.tailNumber}</p>
+                                <p class="text-sm text-slate-500">${aircraft.model}</p>
+                            </div>
+                            <span class="text-xs font-medium px-2 py-1 rounded-full ${getStatusClass(aircraft.status)}">${aircraft.status}</span>
+                        </div>
+                    `;
+                });
+            }
+        }
+
+        function getStatusClass(status) {
+            const statusMap = {
+                'Active': 'bg-green-100 text-green-800',
+                'On Time': 'bg-green-100 text-green-800',
+                'Scheduled': 'bg-blue-100 text-blue-800',
+                'Delayed': 'bg-yellow-100 text-yellow-800',
+                'Cancelled': 'bg-red-100 text-red-800',
+                'Maintenance': 'bg-orange-100 text-orange-800',
+                'Grounded': 'bg-gray-100 text-gray-800',
+                'pending': 'bg-yellow-100 text-yellow-800',
+                'accepted': 'bg-green-100 text-green-800'
+            };
+            return statusMap[status] || 'bg-gray-100 text-gray-800';
+        }
+        
+        // --- FLEET MANAGEMENT ---
+        async function loadFleet() {
+            const snapshot = await db.collection('fleet').get();
+            const tableBody = document.getElementById('fleet-table-body');
+            tableBody.innerHTML = '';
+            
+            if (snapshot.empty) {
+                tableBody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-slate-400">No aircraft in fleet</td></tr>';
+                return;
+            }
+            
+            snapshot.forEach(doc => {
+                const aircraft = doc.data();
+                tableBody.innerHTML += `
+                    <tr class="bg-white border-b hover:bg-slate-50">
+                        <td class="px-6 py-4 font-medium text-slate-900">${aircraft.tailNumber}</td>
+                        <td class="px-6 py-4">${aircraft.model}</td>
+                        <td class="px-6 py-4">${aircraft.capacity}</td>
+                        <td class="px-6 py-4"><span class="status-badge ${getStatusClass(aircraft.status)}">${aircraft.status}</span></td>
+                        <td class="px-6 py-4 text-right space-x-2">
+                            <button onclick="showAddEditFleetModal('${doc.id}')" class="font-medium text-blue-600 hover:underline">Edit</button>
+                            <button onclick="deleteFleet('${doc.id}')" class="font-medium text-red-600 hover:underline">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+        
+        async function showAddEditFleetModal(fleetId = null) {
+            let existingData = {};
+            if (fleetId) {
+                const doc = await db.collection('fleet').doc(fleetId).get();
+                existingData = doc.data();
+            }
+            
+            const { value: formValues } = await Swal.fire({
+                title: fleetId ? 'Edit Aircraft' : 'Add New Aircraft',
+                html: `
+                    <input id="swal-tailNumber" class="modal-input mt-2" placeholder="Tail Number (e.g., N12345)" value="${existingData.tailNumber || ''}">
+                    <input id="swal-model" class="modal-input mt-2" placeholder="Aircraft Model (e.g., Boeing 737)" value="${existingData.model || ''}">
+                    <input id="swal-capacity" type="number" class="modal-input mt-2" placeholder="Passenger Capacity" value="${existingData.capacity || ''}">
+                    <select id="swal-status" class="modal-input mt-2">
+                        <option value="Active" ${existingData.status === 'Active' ? 'selected' : ''}>Active</option>
+                        <option value="Maintenance" ${existingData.status === 'Maintenance' ? 'selected' : ''}>Maintenance</option>
+                        <option value="Grounded" ${existingData.status === 'Grounded' ? 'selected' : ''}>Grounded</option>
+                    </select>
+                `,
+                confirmButtonText: 'Save',
+                showCancelButton: true,
+                confirmButtonColor: '#1e40af',
+                preConfirm: () => {
+                    const data = {
+                        tailNumber: document.getElementById('swal-tailNumber').value.trim(),
+                        model: document.getElementById('swal-model').value.trim(),
+                        capacity: parseInt(document.getElementById('swal-capacity').value),
+                        status: document.getElementById('swal-status').value
+                    };
+                    if (!data.tailNumber || !data.model || !data.capacity) {
+                        Swal.showValidationMessage('Please fill all fields');
+                        return false;
+                    }
+                    return data;
+                }
+            });
+
+            if (formValues) {
+                try {
+                    if (fleetId) {
+                        await db.collection('fleet').doc(fleetId).update(formValues);
+                    } else {
+                        await db.collection('fleet').add(formValues);
+                    }
+                    await Swal.fire('Success!', `Aircraft ${fleetId ? 'updated' : 'added'} successfully.`, 'success');
+                    loadFleet();
+                    loadStats();
+                } catch (error) {
+                    Swal.fire('Error', error.message, 'error');
+                }
+            }
+        }
+
+        async function deleteFleet(fleetId) {
+            const { isConfirmed } = await Swal.fire({
+                title: 'Are you sure?',
+                text: "This will permanently delete this aircraft!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc2626',
+                confirmButtonText: 'Yes, delete it!'
+            });
+
+            if (isConfirmed) {
+                await db.collection('fleet').doc(fleetId).delete();
+                await Swal.fire('Deleted!', 'Aircraft has been removed.', 'success');
+                loadFleet();
+                loadStats();
+            }
+        }
+        
+        // --- FLIGHT MANAGEMENT ---
+        async function loadFlights() {
+            const snapshot = await db.collection('flights').orderBy('date', 'desc').get();
+            const tableBody = document.getElementById('flights-table-body');
+            tableBody.innerHTML = '';
+            
+            if (snapshot.empty) {
+                tableBody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-slate-400">No flights scheduled</td></tr>';
+                return;
+            }
+            
+            snapshot.forEach(doc => {
+                const flight = doc.data();
+                tableBody.innerHTML += `
+                    <tr class="bg-white border-b hover:bg-slate-50">
+                        <td class="px-6 py-4 font-medium text-slate-900">${flight.flightNumber}</td>
+                        <td class="px-6 py-4">${flight.from} → ${flight.to}</td>
+                        <td class="px-6 py-4">
+                            <div>${flight.date}</div>
+                            <div class="text-xs text-slate-500">${flight.time || 'N/A'} → ${flight.landingTime || 'N/A'}</div>
+                        </td>
+                        <td class="px-6 py-4">${flight.assignedAircraft || 'N/A'}</td>
+                        <td class="px-6 py-4"><span class="status-badge ${getStatusClass(flight.status)}">${flight.status}</span></td>
+                        <td class="px-6 py-4 text-right space-x-2">
+                            <button onclick="openCrewManager('${doc.id}')" class="font-medium text-purple-600 hover:underline">Crew</button>
+                            <button onclick="showAddEditFlightModal('${doc.id}')" class="font-medium text-blue-600 hover:underline">Edit</button>
+                            <button onclick="deleteFlight('${doc.id}')" class="font-medium text-red-600 hover:underline">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+        
+        async function showAddEditFlightModal(flightId = null) {
+            let existingData = {};
+            if (flightId) {
+                existingData = (await db.collection('flights').doc(flightId).get()).data();
+            }
+            
+            const fleetSnapshot = await db.collection('fleet').where('status', '==', 'Active').get();
+            let fleetOptions = '<option value="">Assign Aircraft</option>';
+            fleetSnapshot.docs.forEach(doc => {
+                const aircraft = doc.data();
+                fleetOptions += `<option value="${aircraft.tailNumber}" ${existingData.assignedAircraft === aircraft.tailNumber ? 'selected' : ''}>${aircraft.tailNumber} (${aircraft.model})</option>`;
+            });
+            
+            const { value: formValues } = await Swal.fire({
+                title: flightId ? 'Edit Flight' : 'Add New Flight',
+                html: `
+                    <div class="grid grid-cols-2 gap-4 text-left">
+                        <input id="swal-flightNumber" class="modal-input col-span-2" placeholder="Flight Number (e.g., SF101)" value="${existingData.flightNumber || ''}">
+                        <input id="swal-from" class="modal-input" placeholder="Origin (e.g., JFK)" value="${existingData.from || ''}">
+                        <input id="swal-to" class="modal-input" placeholder="Destination (e.g., LAX)" value="${existingData.to || ''}">
+                        
+                        <div class="col-span-2">
+                             <label class="block text-sm font-medium text-slate-600 mb-1">Flight Date</label>
+                             <input id="swal-date" type="date" class="modal-input" value="${existingData.date || ''}">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-600 mb-1">Departure Time</label>
+                            <input id="swal-time" type="time" class="modal-input" value="${existingData.time || ''}">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-600 mb-1">Landing Time</label>
+                            <input id="swal-landingTime" type="time" class="modal-input" value="${existingData.landingTime || ''}">
+                        </div>
+                        <select id="swal-aircraft" class="modal-input col-span-2">${fleetOptions}</select>
+                        <select id="swal-flight-status" class="modal-input col-span-2">
+                            <option value="Scheduled" ${existingData.status === 'Scheduled' ? 'selected' : ''}>Scheduled</option>
+                            <option value="On Time" ${existingData.status === 'On Time' ? 'selected' : ''}>On Time</option>
+                            <option value="Delayed" ${existingData.status === 'Delayed' ? 'selected' : ''}>Delayed</option>
+                            <option value="Cancelled" ${existingData.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
+                        </select>
+                    </div>
+                `,
+                width: '600px',
+                confirmButtonText: 'Save',
+                showCancelButton: true,
+                confirmButtonColor: '#1e40af',
+                preConfirm: () => {
+                    const data = {
+                        flightNumber: document.getElementById('swal-flightNumber').value.trim(),
+                        from: document.getElementById('swal-from').value.trim(),
+                        to: document.getElementById('swal-to').value.trim(),
+                        date: document.getElementById('swal-date').value,
+                        time: document.getElementById('swal-time').value,
+                        landingTime: document.getElementById('swal-landingTime').value,
+                        assignedAircraft: document.getElementById('swal-aircraft').value,
+                        status: document.getElementById('swal-flight-status').value,
+                    };
+                    if (!data.flightNumber || !data.from || !data.to || !data.date || !data.time || !data.landingTime) {
+                        Swal.showValidationMessage('Please fill all required fields, including departure and landing times.');
+                        return false;
+                    }
+                    return data;
+                }
+            });
+
+            if (formValues) {
+                try {
+                    if (flightId) {
+                        await db.collection('flights').doc(flightId).update(formValues);
+                    } else {
+                        await db.collection('flights').add({
+                            ...formValues,
+                            crewManifest: {}
+                        });
+                    }
+                    await Swal.fire('Success!', `Flight ${flightId ? 'updated' : 'added'} successfully.`, 'success');
+                    loadFlights();
+                    loadStats();
+                } catch (error) {
+                    Swal.fire('Error', error.message, 'error');
+                }
+            }
+        }
+
+        async function deleteFlight(flightId) {
+            const { isConfirmed } = await Swal.fire({
+                title: 'Are you sure?',
+                text: "This will permanently delete this flight!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc2626',
+                confirmButtonText: 'Yes, delete it!'
+            });
+
+            if (isConfirmed) {
+                await db.collection('flights').doc(flightId).delete();
+                await Swal.fire('Deleted!', 'Flight has been removed.', 'success');
+                loadFlights();
+                loadStats();
+            }
+        }
+        
+        // --- CREW SCHEDULING & ALLOCATION ---
+        async function generateCalendar(year, month) {
+            const calendarGrid = document.getElementById('calendar-grid');
+            const monthYearEl = document.getElementById('calendar-month-year');
+            calendarGrid.innerHTML = '';
+            
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            
+            monthYearEl.textContent = firstDay.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+            const startOfMonth = firstDay.toISOString().slice(0, 10);
+            const endOfMonth = lastDay.toISOString().slice(0, 10);
+            
+            const flightsSnapshot = await db.collection('flights')
+                .where('date', '>=', startOfMonth)
+                .where('date', '<=', endOfMonth)
+                .get();
+            
+            const flightsByDay = {};
+            flightsSnapshot.forEach(doc => {
+                const flight = { id: doc.id, ...doc.data() };
+                const day = new Date(flight.date + 'T00:00:00').getDate();
+                if (!flightsByDay[day]) flightsByDay[day] = [];
+                flightsByDay[day].push(flight);
+            });
+            
+            // Add blank days for start of month
+            for (let i = 0; i < firstDay.getDay(); i++) {
+                calendarGrid.innerHTML += `<div class="calendar-day other-month"></div>`;
+            }
+            
+            // Add days of month
+            for (let day = 1; day <= lastDay.getDate(); day++) {
+                let dayHtml = `<div class="calendar-day">
+                                    <div class="calendar-day-header">${day}</div>
+                                    <div class="space-y-1">`;
+                if (flightsByDay[day]) {
+                    flightsByDay[day].forEach(flight => {
+                        dayHtml += `<div class="flight-event" onclick="openCrewManager('${flight.id}')">
+                                        <p class="font-bold">${flight.flightNumber}</p>
+                                        <p class="text-xs">${flight.from} → ${flight.to}</p>
+                                        <p class="text-xs">${flight.time} - ${flight.landingTime || 'N/A'}</p>
+                                    </div>`;
+                    });
+                }
+                dayHtml += `</div></div>`;
+                calendarGrid.innerHTML += dayHtml;
+            }
+        }
+
+        async function openCrewManager(flightId) {
+            const flightDoc = await db.collection('flights').doc(flightId).get();
+            if (!flightDoc.exists) {
+                Swal.fire('Error', 'Flight not found', 'error');
+                return;
+            }
+            
+            const flight = flightDoc.data();
+            const manifest = flight.crewManifest || {};
+
+            const generateRoleHtml = (roles, isMultiple) => {
+                return Object.entries(roles).map(([key, role]) => {
+                    const assigned = manifest[key];
+                    let assignedHtml = '';
+                    
+                    if (!isMultiple) {
+                        // In-flight crew (single assignment)
+                        if (assigned && typeof assigned === 'object' && assigned.email) {
+                            assignedHtml = `<div class="flex flex-col items-end gap-1">
+                                    <div class="flex items-center gap-2 font-semibold text-sm bg-green-50 px-3 py-2 rounded-lg">
+                                        <div class="text-left">
+                                            <div class="text-green-700 font-bold">${assigned.email}</div>
+                                            <div class="text-xs text-green-600">⏰ Working: ${assigned.startTime} - ${assigned.endTime}</div>
+                                            <div class="text-xs text-green-600">📍 Full Flight Duration</div>
+                                        </div>
+                                        <button onclick="unassignCrew('${flightId}', '${key}', '${assigned.email}', false)" class="text-red-500 hover:text-red-700 text-lg">×</button>
+                                    </div>
+                                </div>`;
+                        } else {
+                            assignedHtml = `<button onclick="assignCrew('${flightId}', '${key}', '${role.label}', false)" class="text-blue-600 hover:underline text-sm">+ Assign</button>`;
+                        }
+                    } else {
+                        // Ground staff (multiple assignments with location)
+                        const staffList = (assigned || []).map(staffMember => {
+                            if (typeof staffMember === 'object' && staffMember.email) {
+                                return `<div class="flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-lg text-xs">
+                                        <div class="text-left">
+                                            <div class="font-bold text-slate-800">${staffMember.email}</div>
+                                            <div class="text-slate-600">⏰ ${staffMember.startTime} - ${staffMember.endTime}</div>
+                                            <div class="text-slate-600">📍 ${staffMember.airport} (${staffMember.location})</div>
+                                        </div>
+                                        <button onclick="unassignCrew('${flightId}', '${key}', '${staffMember.email}', true)" class="text-red-500 hover:text-red-700 text-lg">×</button>
+                                      </div>`;
+                            }
+                            return '';
+                        }).join('');
+                        assignedHtml = `<div class="flex flex-col items-end gap-1">
+                                            ${staffList}
+                                            <button onclick="assignCrew('${flightId}', '${key}', '${role.label}', true)" class="text-blue-600 hover:underline text-sm mt-1">+ Add</button>
+                                        </div>`;
+                    }
+                    
+                    return `<div class="p-3 border-b flex justify-between items-center">
+                                <span class="text-slate-700 font-medium text-sm">${role.label}</span>
+                                ${assignedHtml}
+                            </div>`;
+                }).join('');
+            };
+            
+            Swal.fire({
+                title: `Crew Assignment - ${flight.flightNumber}`,
+                html: `
+                    <div class="text-left max-h-[70vh] overflow-y-auto p-1">
+                        <div class="bg-blue-50 p-3 rounded-lg mb-4">
+                            <p class="text-sm"><strong>Route:</strong> ${flight.from} → ${flight.to}</p>
+                            <p class="text-sm"><strong>Date:</strong> ${flight.date}</p>
+                            <p class="text-sm"><strong>Schedule:</strong> Departs ${flight.time}, Lands ${flight.landingTime || 'N/A'}</p>
+                        </div>
+                        <h3 class="font-bold text-lg text-slate-800 mt-4 mb-2">✈️ In-Flight Crew</h3>
+                        <p class="text-xs text-slate-500 mb-2">Crew will be scheduled for the full flight duration.</p>
+                        <div class="border rounded-lg bg-white">${generateRoleHtml(IN_FLIGHT_ROLES, false)}</div>
+                        <h3 class="font-bold text-lg text-slate-800 mt-4 mb-2">🔧 Ground Staff</h3>
+                        <p class="text-xs text-slate-500 mb-2">Staff are scheduled for 1 hour shifts, starting 45 minutes before departure or landing.</p>
+                        <div class="border rounded-lg bg-white">${generateRoleHtml(GROUND_STAFF_ROLES, true)}</div>
+                    </div>
+                `,
+                width: '900px',
+                showConfirmButton: false,
+                showCloseButton: true,
+            });
+        }
+
+        function parseTime(timeStr) {
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            const date = new Date();
+            date.setHours(hours, minutes, 0, 0);
+            return date;
+        }
+
+        function formatTime(dateObj) {
+            return `${dateObj.getHours().toString().padStart(2, '0')}:${dateObj.getMinutes().toString().padStart(2, '0')}`;
+        }
+        
+        window.assignCrew = async (flightId, roleKey, roleLabel, isMultiple) => {
+            const allCrewSnapshot = await db.collection('users').where('role', '==', 'crew').get();
+            
+            if (allCrewSnapshot.empty) {
+                Swal.fire('No Crew Available', 'Please add crew members first.', 'warning');
+                return;
+            }
+            
+            const inputOptions = {};
+            allCrewSnapshot.forEach(doc => {
+                const crewData = doc.data();
+                inputOptions[crewData.email] = `${crewData.name || crewData.email} (${crewData.crewType || 'Crew'})`;
+            });
+            
+            const flightDoc = await db.collection('flights').doc(flightId).get();
+            const flight = flightDoc.data();
+            
+            let scheduleHtml = '';
+            if (isMultiple) {
+                scheduleHtml = `
+                    <div class="mt-4 p-4 bg-blue-50 rounded-lg text-left">
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Assign Location:</label>
+                        <select id="swal-location" class="modal-input">
+                            <option value="departure">Departure Airport (${flight.from})</option>
+                            <option value="arrival">Arrival Airport (${flight.to})</option>
+                        </select>
+                        <p class="text-xs text-slate-600 mt-2">Staff will be scheduled 45 minutes before their respective event (departure or landing).</p>
+                    </div>
+                `;
+            } else {
+                scheduleHtml = `
+                    <div class="mt-4 p-4 bg-green-50 rounded-lg text-left">
+                        <p class="text-sm text-green-700">✈️ This crew member will be scheduled for the full flight duration.</p>
+                        <p class="text-xs text-green-600 mt-1">Working hours: ${flight.time} (departure) to ${flight.landingTime} (landing).</p>
+                    </div>
+                `;
+            }
+            
+            const { value: formValues } = await Swal.fire({
+                title: `Assign ${roleLabel}`,
+                html: `
+                    <label class="block text-left text-sm font-semibold text-slate-700 mb-2">Select Crew Member:</label>
+                    <select id="swal-crew-select" class="modal-input">
+                        <option value="">Choose a crew member...</option>
+                        ${Object.entries(inputOptions).map(([email, name]) => `<option value="${email}">${name}</option>`).join('')}
+                    </select>
+                    ${scheduleHtml}
+                `,
+                showCancelButton: true,
+                confirmButtonColor: '#1e40af',
+                confirmButtonText: 'Assign Crew',
+                width: '600px',
+                preConfirm: () => {
+                    const email = document.getElementById('swal-crew-select').value;
+                    if (!email) {
+                        Swal.showValidationMessage('Please select a crew member');
+                        return false;
+                    }
+                    
+                    const result = { email };
+                    if (isMultiple) {
+                        result.location = document.getElementById('swal-location').value;
+                    }
+                    return result;
+                }
+            });
+            
+            if (!formValues) return;
+            
+            const email = formValues.email;
+            const conflictingFlight = await checkCrewConflict(email, flight.date, flight.time, flightId);
+            
+            if (conflictingFlight) {
+                const { isConfirmed } = await Swal.fire({
+                    icon: 'warning',
+                    title: 'Scheduling Conflict Detected!',
+                    html: `<div class="text-left">
+                        <p class="mb-2"><strong>${email}</strong> is already assigned to:</p>
+                        <div class="bg-yellow-50 p-3 rounded-lg">
+                            <p><strong>Flight:</strong> ${conflictingFlight.flightNumber}</p>
+                            <p><strong>Route:</strong> ${conflictingFlight.from} → ${conflictingFlight.to}</p>
+                            <p><strong>Date:</strong> ${conflictingFlight.date} at ${conflictingFlight.time}</p>
+                        </div>
+                        <p class="mt-3">Do you want to remove them from the previous flight and assign to this one?</p>
+                    </div>`,
+                    showCancelButton: true,
+                    confirmButtonText: 'Yes, Re-assign',
+                    confirmButtonColor: '#dc2626'
+                });
+                
+                if (!isConfirmed) return;
+                await unassignCrewByEmail(conflictingFlight.id, email);
+            }
+            
+            let crewAssignment = { email };
+            
+            if (isMultiple) { // Ground staff
+                crewAssignment.location = formValues.location;
+                if (formValues.location === 'departure') {
+                    const departureTime = parseTime(flight.time);
+                    const startTime = new Date(departureTime.getTime() - 45 * 60 * 1000);
+                    const endTime = new Date(departureTime.getTime() + 15 * 60 * 1000);
+                    crewAssignment.startTime = formatTime(startTime);
+                    crewAssignment.endTime = formatTime(endTime);
+                    crewAssignment.airport = flight.from;
+                } else { // arrival
+                    const landingTime = parseTime(flight.landingTime);
+                    const startTime = new Date(landingTime.getTime() - 45 * 60 * 1000);
+                    const endTime = new Date(landingTime.getTime() + 15 * 60 * 1000);
+                    crewAssignment.startTime = formatTime(startTime);
+                    crewAssignment.endTime = formatTime(endTime);
+                    crewAssignment.airport = flight.to;
+                }
+            } else { // In-flight crew
+                crewAssignment.startTime = flight.time;
+                crewAssignment.endTime = flight.landingTime;
+                crewAssignment.location = 'in-flight';
+            }
+            
+            const update = {};
+            update[`crewManifest.${roleKey}`] = isMultiple ? FieldValue.arrayUnion(crewAssignment) : crewAssignment;
+            await db.collection('flights').doc(flightId).update(update);
+            
+            await Swal.fire('Success!', `${email} assigned to ${roleLabel}`, 'success');
+            openCrewManager(flightId);
+        }
+
+        window.unassignCrew = async (flightId, roleKey, email, isMultiple) => {
+            const flightDoc = await db.collection('flights').doc(flightId).get();
+            const manifest = flightDoc.data().crewManifest || {};
+            
+            const update = {};
+            if (isMultiple) {
+                const assignments = manifest[roleKey] || [];
+                const updatedAssignments = assignments.filter(a => (typeof a === 'object' ? a.email : a) !== email);
+                update[`crewManifest.${roleKey}`] = updatedAssignments;
+            } else {
+                update[`crewManifest.${roleKey}`] = FieldValue.delete();
+            }
+            
+            await db.collection('flights').doc(flightId).update(update);
+            openCrewManager(flightId);
+        }
+
+        async function checkCrewConflict(email, date, time, currentFlightId) {
+            const flightsOnDay = await db.collection('flights').where('date', '==', date).get();
+            
+            for (const doc of flightsOnDay.docs) {
+                if (doc.id === currentFlightId) continue;
+                
+                const manifest = doc.data().crewManifest || {};
+                
+                for (const [roleKey, assignment] of Object.entries(manifest)) {
+                    if (!assignment) continue;
+                    
+                    if (typeof assignment === 'object' && !Array.isArray(assignment) && assignment.email === email) {
+                        return { id: doc.id, ...doc.data() };
+                    } else if (Array.isArray(assignment)) {
+                        const hasConflict = assignment.some(a => (typeof a === 'object' ? a.email : a) === email);
+                        if (hasConflict) {
+                            return { id: doc.id, ...doc.data() };
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        async function unassignCrewByEmail(flightId, email) {
+            const flightDoc = await db.collection('flights').doc(flightId).get();
+            const manifest = flightDoc.data().crewManifest || {};
+            const update = {};
+            
+            for (const key in manifest) {
+                const assignment = manifest[key];
+                if (!assignment) continue;
+                
+                if (typeof assignment === 'object' && !Array.isArray(assignment) && assignment.email === email) {
+                    update[`crewManifest.${key}`] = FieldValue.delete();
+                } else if (Array.isArray(assignment)) {
+                    const filtered = assignment.filter(a => (typeof a === 'object' ? a.email : a) !== email);
+                    if (filtered.length !== assignment.length) {
+                        update[`crewManifest.${key}`] = filtered;
+                    }
+                }
+            }
+            
+            if (Object.keys(update).length > 0) {
+                await db.collection('flights').doc(flightId).update(update);
+            }
+        }
+
+        // --- CREW ROSTER MANAGEMENT ---
+        async function loadCrew() {
+            const snapshot = await db.collection('users').where('role', '==', 'crew').get();
+            const tableBody = document.getElementById('crew-table-body');
+            tableBody.innerHTML = '';
+            
+            if (snapshot.empty) {
+                tableBody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-slate-400">No crew members</td></tr>';
+                return;
+            }
+            
+            snapshot.forEach(doc => {
+                const crew = doc.data();
+                tableBody.innerHTML += `
+                    <tr class="bg-white border-b hover:bg-slate-50">
+                        <td class="px-6 py-4 font-medium text-slate-900">${crew.name || 'N/A'}</td>
+                        <td class="px-6 py-4">${crew.email}</td>
+                        <td class="px-6 py-4">${crew.crewType || 'N/A'}</td>
+                        <td class="px-6 py-4"><span class="status-badge ${getStatusClass(crew.status || 'Active')}">${crew.status || 'Active'}</span></td>
+                        <td class="px-6 py-4 text-right space-x-2">
+                            <button onclick="showAddEditCrewModal('${doc.id}')" class="font-medium text-blue-600 hover:underline">Edit</button>
+                            <button onclick="deleteCrew('${doc.id}')" class="font-medium text-red-600 hover:underline">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function showAddEditCrewModal(crewId = null) {
+            let existingData = {};
+            if (crewId) {
+                const doc = await db.collection('users').doc(crewId).get();
+                existingData = doc.data();
+            }
+            
+            const { value: formValues } = await Swal.fire({
+                title: crewId ? 'Edit Crew Member' : 'Add Crew Member',
+                html: `
+                    <input id="swal-name" class="modal-input mt-2" placeholder="Full Name" value="${existingData.name || ''}">
+                    <input id="swal-email" class="modal-input mt-2" placeholder="Email" value="${existingData.email || ''}" ${crewId ? 'readonly' : ''}>
+                    <select id="swal-crewType" class="modal-input mt-2">
+                        <option value="">Select Crew Type</option>
+                        <option value="Pilot" ${existingData.crewType === 'Pilot' ? 'selected' : ''}>Pilot</option>
+                        <option value="Co-pilot" ${existingData.crewType === 'Co-pilot' ? 'selected' : ''}>Co-pilot</option>
+                        <option value="Cabin Crew Manager" ${existingData.crewType === 'Cabin Crew Manager' ? 'selected' : ''}>Cabin Crew Manager</option>
+                        <option value="Cabin Crew" ${existingData.crewType === 'Cabin Crew' ? 'selected' : ''}>Cabin Crew</option>
+                        <option value="Ground Staff" ${existingData.crewType === 'Ground Staff' ? 'selected' : ''}>Ground Staff</option>
+                    </select>
+                    <select id="swal-crew-status" class="modal-input mt-2">
+                        <option value="Active" ${existingData.status === 'Active' ? 'selected' : ''}>Active</option>
+                        <option value="On Leave" ${existingData.status === 'On Leave' ? 'selected' : ''}>On Leave</option>
+                        <option value="Inactive" ${existingData.status === 'Inactive' ? 'selected' : ''}>Inactive</option>
+                    </select>
+                `,
+                confirmButtonText: 'Save',
+                showCancelButton: true,
+                confirmButtonColor: '#1e40af',
+                preConfirm: () => {
+                    const data = {
+                        name: document.getElementById('swal-name').value.trim(),
+                        email: document.getElementById('swal-email').value.trim(),
+                        crewType: document.getElementById('swal-crewType').value,
+                        status: document.getElementById('swal-crew-status').value,
+                        role: 'crew'
+                    };
+                    if (!data.name || !data.email || !data.crewType) {
+                        Swal.showValidationMessage('Please fill all fields');
+                        return false;
+                    }
+                    return data;
+                }
+            });
+
+            if (formValues) {
+                try {
+                    if (crewId) {
+                        delete formValues.email; // Don't update email
+                        await db.collection('users').doc(crewId).update(formValues);
+                    } else {
+                        await db.collection('users').add(formValues);
+                    }
+                    await Swal.fire('Success!', `Crew member ${crewId ? 'updated' : 'added'} successfully.`, 'success');
+                    loadCrew();
+                    loadStats();
+                } catch (error) {
+                    Swal.fire('Error', error.message, 'error');
+                }
+            }
+        }
+
+        async function deleteCrew(crewId) {
+            const { isConfirmed } = await Swal.fire({
+                title: 'Are you sure?',
+                text: "This will permanently delete this crew member!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc2626',
+                confirmButtonText: 'Yes, delete it!'
+            });
+
+            if (isConfirmed) {
+                await db.collection('users').doc(crewId).delete();
+                await Swal.fire('Deleted!', 'Crew member has been removed.', 'success');
+                loadCrew();
+                loadStats();
+            }
+        }
+        
+        // --- BOOKINGS MANAGEMENT ---
+        async function loadBookings() {
+            const snapshot = await db.collection('bookings').orderBy('bookingDate', 'desc').get();
+            const tableBody = document.getElementById('bookings-table-body');
+            tableBody.innerHTML = '';
+            
+            if (snapshot.empty) {
+                tableBody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-slate-400">No bookings found</td></tr>';
+                return;
+            }
+            
+            snapshot.forEach(doc => {
+                const booking = doc.data();
+                tableBody.innerHTML += `
+                    <tr class="bg-white border-b hover:bg-slate-50">
+                        <td class="px-6 py-4 font-medium text-slate-900">${doc.id.substring(0, 8)}</td>
+                        <td class="px-6 py-4">${booking.passengerName || 'N/A'}</td>
+                        <td class="px-6 py-4">${booking.flightNumber || 'N/A'}</td>
+                        <td class="px-6 py-4">${booking.bookingDate || 'N/A'}</td>
+                        <td class="px-6 py-4"><span class="status-badge ${getStatusClass(booking.status || 'pending')}">${booking.status || 'pending'}</span></td>
+                        <td class="px-6 py-4 text-right space-x-2">
+                            <button onclick="viewBookingDetails('${doc.id}')" class="font-medium text-blue-600 hover:underline">View</button>
+                            <button onclick="deleteBooking('${doc.id}')" class="font-medium text-red-600 hover:underline">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function viewBookingDetails(bookingId) {
+            const doc = await db.collection('bookings').doc(bookingId).get();
+            const booking = doc.data();
+            
+            Swal.fire({
+                title: 'Booking Details',
+                html: `
+                    <div class="text-left space-y-2">
+                        <p><strong>Booking ID:</strong> ${bookingId}</p>
+                        <p><strong>Passenger:</strong> ${booking.passengerName || 'N/A'}</p>
+                        <p><strong>Email:</strong> ${booking.passengerEmail || 'N/A'}</p>
+                        <p><strong>Flight:</strong> ${booking.flightNumber || 'N/A'}</p>
+                        <p><strong>Date:</strong> ${booking.bookingDate || 'N/A'}</p>
+                        <p><strong>Status:</strong> ${booking.status || 'pending'}</p>
+                    </div>
+                `,
+                confirmButtonColor: '#1e40af'
+            });
+        }
+
+        async function deleteBooking(bookingId) {
+            const { isConfirmed } = await Swal.fire({
+                title: 'Are you sure?',
+                text: "This will permanently delete this booking!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc2626',
+                confirmButtonText: 'Yes, delete it!'
+            });
+
+            if (isConfirmed) {
+                await db.collection('bookings').doc(bookingId).delete();
+                await Swal.fire('Deleted!', 'Booking has been removed.', 'success');
+                loadBookings();
+            }
+        }
+        
+        // --- INVITE MANAGEMENT ---
+        async function loadInvites() {
+            const snapshot = await db.collection('invites').orderBy('sentAt', 'desc').get();
+            const tableBody = document.getElementById('invites-table-body');
+            tableBody.innerHTML = '';
+            
+            if (snapshot.empty) {
+                tableBody.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-slate-400">No invites sent</td></tr>';
+                return;
+            }
+            
+            snapshot.forEach(doc => {
+                const invite = doc.data();
+                const sentDate = invite.sentAt?.toDate ? invite.sentAt.toDate().toLocaleDateString() : 'N/A';
+                
+                tableBody.innerHTML += `
+                    <tr class="bg-white border-b hover:bg-slate-50">
+                        <td class="px-6 py-4 font-medium text-slate-900">${invite.email}</td>
+                        <td class="px-6 py-4">${sentDate}</td>
+                        <td class="px-6 py-4"><span class="status-badge ${getStatusClass(invite.status)}">${invite.status}</span></td>
+                        <td class="px-6 py-4 text-right space-x-2">
+                            <button onclick="resendInvite('${doc.id}')" class="font-medium text-blue-600 hover:underline">Resend</button>
+                            <button onclick="revokeInvite('${doc.id}')" class="font-medium text-red-600 hover:underline">Revoke</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+        
+        async function sendNewInvite() {
+            const { value: formValues } = await Swal.fire({
+                title: 'Send New Invite',
+                html: `
+                    <input id="swal-invite-email" type="email" class="modal-input mt-2" placeholder="Email address">
+                    <select id="swal-invite-role" class="modal-input mt-2">
+                        <option value="">Select Role</option>
+                        <option value="crew">Crew Member</option>
+                        <option value="user">Passenger</option>
+                    </select>
+                `,
+                showCancelButton: true,
+                confirmButtonColor: '#1e40af',
+                confirmButtonText: 'Send Invite',
+                preConfirm: () => {
+                    const email = document.getElementById('swal-invite-email').value.trim();
+                    const role = document.getElementById('swal-invite-role').value;
+                    if (!email || !role) {
+                        Swal.showValidationMessage('Please fill all fields');
+                        return false;
+                    }
+                    return { email, role };
+                }
+            });
+
+            if (formValues) {
+                try {
+                    await db.collection('invites').add({
+                        email: formValues.email,
+                        role: formValues.role,
+                        status: 'pending',
+                        sentAt: FieldValue.serverTimestamp()
+                    });
+                    await Swal.fire('Sent!', 'Invitation has been sent successfully.', 'success');
+                    loadInvites();
+                    loadStats();
+                } catch (error) {
+                    Swal.fire('Error', error.message, 'error');
+                }
+            }
+        }
+
+        async function resendInvite(inviteId) {
+            await db.collection('invites').doc(inviteId).update({
+                sentAt: FieldValue.serverTimestamp(),
+                status: 'pending'
+            });
+            await Swal.fire('Resent!', 'Invitation has been resent.', 'success');
+            loadInvites();
+        }
+
+        async function revokeInvite(inviteId) {
+            const { isConfirmed } = await Swal.fire({
+                title: 'Are you sure?',
+                text: "This will revoke the invitation.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc2626',
+                confirmButtonText: 'Yes, revoke it!'
+            });
+
+            if (isConfirmed) {
+                await db.collection('invites').doc(inviteId).delete();
+                await Swal.fire('Revoked!', 'Invitation has been revoked.', 'success');
+                loadInvites();
+                loadStats();
+            }
+        }
+
+        // --- ANALYTICS ---
+        async function loadAnalytics() {
+            const flightsSnapshot = await db.collection('flights').get();
+            const fleetSnapshot = await db.collection('fleet').get();
+            
+            // Flight analytics
+            const flightAnalytics = document.getElementById('flight-analytics');
+            const statusCounts = {};
+            flightsSnapshot.forEach(doc => {
+                const status = doc.data().status;
+                statusCounts[status] = (statusCounts[status] || 0) + 1;
+            });
+            
+            flightAnalytics.innerHTML = Object.entries(statusCounts).map(([status, count]) => `
+                <div class="flex justify-between items-center p-2 bg-slate-50 rounded">
+                    <span class="text-slate-700">${status}</span>
+                    <span class="font-bold text-slate-900">${count}</span>
+                </div>
+            `).join('');
+
+            // Fleet analytics
+            const fleetAnalytics = document.getElementById('fleet-analytics');
+            const fleetStatusCounts = {};
+            fleetSnapshot.forEach(doc => {
+                const status = doc.data().status;
+                fleetStatusCounts[status] = (fleetStatusCounts[status] || 0) + 1;
+            });
+            
+            fleetAnalytics.innerHTML = Object.entries(fleetStatusCounts).map(([status, count]) => `
+                <div class="flex justify-between items-center p-2 bg-slate-50 rounded">
+                    <span class="text-slate-700">${status}</span>
+                    <span class="font-bold text-slate-900">${count}</span>
+                </div>
+            `).join('');
+        }
+
+        // --- UTILITIES ---
+        function logout() {
+            auth.signOut().then(() => {
+                window.location.href = 'login.html';
+            });
+        }
+    </script>
+</body>
+</html>
